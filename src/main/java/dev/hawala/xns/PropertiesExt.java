@@ -28,6 +28,7 @@ package dev.hawala.xns;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.util.Properties;
 
 /**
@@ -48,11 +49,9 @@ public class PropertiesExt extends Properties {
 		if (cfgFile == null || !cfgFile.isFile() || !cfgFile.canRead()) {
 			return;
 		}
-		try {
-			FileInputStream fis = new FileInputStream(cfgFile);
+		try (FileInputStream fis = new FileInputStream(cfgFile)) {
 			this.load(fis);
-			fis.close();
-		} catch (Exception e) {
+		} catch (IOException e) {
 			System.err.printf("Error: unable to load configuration from properties file: %s\n", cfgFile.getName());
 			System.err.printf("=> %s\n", e.getMessage());
 		}
