@@ -158,9 +158,9 @@ public class XnsResponder {
 				usage(true);
 			} else if ("+v".equals(a)) {
 				verbose = true;
-			} else if (a.startsWith("hubHost:")) {
+			} else if (a.startsWith("hubhost:")) {
 				hubHost = value;
-			} else if (a.startsWith("hubPort:")) {
+			} else if (a.startsWith("hubport:")) {
 				hubPort = (int)getLong(value, arg, "port");
 			} else if (a.startsWith("net:")) {
 				localNetwork = getLong(value, arg, "network");
