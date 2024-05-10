@@ -124,7 +124,7 @@ public class XnsResponder {
 			System.err.println("  +time[:<gmt-offset-minutes> : enable the time server with the time zone at the given offset");
 			System.err.println("  daysbackintime:<days> : shift the local time by the given days into past");
 			System.err.println("  -rip : disable the Routing Information server");
-			System.err.println("  +rip : enable the Routine Information server");
+			System.err.println("  +rip : enable the Routing Information server");
 			System.err.println("  +bfs:nnn/xx-xx-xx-xx-xx-xx : add a machine at the given network and host ids to BfS responses");
 			System.err.println("defaults:");
 			System.err.println("  hubhost:localhost");
