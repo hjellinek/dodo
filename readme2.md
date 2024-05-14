@@ -1,5 +1,8 @@
 # How to build and run
 
+You'll need to install Java Development Kit (JDK) 8, also
+known as 1.8.
+
 ## Build the JAR file
 
 ````bash

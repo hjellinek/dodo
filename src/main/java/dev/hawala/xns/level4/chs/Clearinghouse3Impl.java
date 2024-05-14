@@ -38,6 +38,7 @@ import dev.hawala.xns.level4.common.ChsDatabase;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.regex.Pattern;
 
 /**
@@ -67,12 +68,21 @@ public class Clearinghouse3Impl {
 	 * Set values to use for responses, BfS requests will use the single host
 	 * {@code network}/{@code machine} as response.
 	 * 
-	 * @param network networkId for the local network, also used for for 'retrieveAddresses'
-	 * @param machine hostId of the local machine, also used for for 'retrieveAddresses'
+	 * @param network networkId for the local network, also used for 'retrieveAddresses'
+	 * @param machine hostId of the local machine, also used for 'retrieveAddresses'
 	 * @param chsDb clearinghouse database to use for courier requests
 	 */
 	public static void init(long network, long machine, ChsDatabase chsDb) {
 		init(network, machine, chsDb, null);
+	}
+
+	/**
+	 * Update/reload the Clearinghouse database.
+	 *
+	 * @param chsDb the new Clearinghouse database
+	 */
+	public static void updateChsDatabase(ChsDatabase chsDb) {
+		init(networkId, machineId, Objects.requireNonNull(chsDb), null);
 	}
 	
 	/**
@@ -83,7 +93,7 @@ public class Clearinghouse3Impl {
 	 * @param chsDb clearinghouse database to use for courier requests
 	 * @param hostIds explicit list of network addresses to respond BfS requests with
 	 * 		(if the local machine is to be part of the BfS responses, the host
-	 * 		{@code network}/{@code machine} must be explicitely added to {@code hostIds})
+	 * 		{@code network}/{@code machine} must be explicitly added to {@code hostIds})
 	 */
 	public static void init(long network, long machine, ChsDatabase chsDb, List<NetworkAddress> hostIds) {
 		networkId = network;

@@ -47,6 +47,7 @@ import dev.hawala.xns.level4.printing.Printing3Impl;
 import dev.hawala.xns.level4.pup.PupHostLookupResponder;
 import dev.hawala.xns.level4.rip.RipResponder;
 import dev.hawala.xns.level4.time.TimeServiceResponder;
+import sun.misc.Signal;
 
 import java.io.File;
 import java.util.HashMap;
@@ -127,6 +128,11 @@ public class DodoServer {
 	
 	// startFileServer <=> fileServiceSpecs.size() > 0
 	private static Map<String,String> fileServiceSpecs = new HashMap<>();
+
+	/**
+	 * Upon receiving this signal, reload the Clearinghouse database.
+	 */
+	private static final Signal RELOAD_CHS_SIGNAL = new Signal("HUP");
 
 	private static boolean initializeConfiguration(String filename) {
 		// load the properties file
@@ -231,6 +237,16 @@ public class DodoServer {
 		return (s == null || s.isEmpty());
 	}
 
+	private static void maybeDumpChs(boolean dumpChs, ChsDatabase chsDatabase) {
+		if (dumpChs) {
+			System.out.println("\n==\n== machine-id pre-definitions:\n==\n");
+			MachineIds.dump();
+			System.out.println("\n==\n== clearinghouse database dump: \n==\n");
+			chsDatabase.dump();
+			System.out.println("\n==\n== end of machine-id and clearinghouse database dumps\n==\n");
+		}
+	}
+
 	public static void main(String[] args) throws XnsException {
 		String machinesFile = null;
 		String baseCfgFile = null;
@@ -298,14 +314,8 @@ public class DodoServer {
 		if (startChsAndAuth || !fileServiceSpecs.isEmpty()) {
 			// create the clearinghouse database
 			chsDatabase = new ChsDatabase(networkNo, organizationName, domainName, chsDatabaseRoot, allowBlanksInObjectNames);
-			
-			if (dumpChs) {
-				System.out.println("\n==\n== machine-id pre-definitions:\n==\n");
-				MachineIds.dump();
-				System.out.println("\n==\n== clearinghouse database dump: \n==\n");
-				chsDatabase.dump();
-				System.out.println("\n==\n== end of machine-id and clearinghouse database dumps\n==\n");
-			}
+
+			maybeDumpChs(dumpChs, chsDatabase);
 		}
 		
 		// check if we have undefined machine names, aborting startup if any
@@ -446,7 +456,18 @@ public class DodoServer {
 		Log.L2.doLog(false);
 		Log.L3.doLog(false);
 		Log.L4.doLog(false);
-		
+
+		// make it final so we can use it in the lambda below
+		final boolean shouldDumpChs = dumpChs;
+		if (startChsAndAuth) {
+			Signal.handle(RELOAD_CHS_SIGNAL, sig -> {
+				final ChsDatabase chsDb = new ChsDatabase(networkNo, organizationName, domainName, chsDatabaseRoot, allowBlanksInObjectNames);
+				Clearinghouse3Impl.updateChsDatabase(chsDb);
+				System.out.println("Reloaded CHS "+chsDb);
+				maybeDumpChs(shouldDumpChs, chsDb);
+			});
+		}
+
 		/*
 		 * let the server machine run...
 		 */

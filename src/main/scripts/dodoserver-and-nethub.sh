@@ -1,7 +1,7 @@
 #!/bin/bash
 
-if [ -f ${HOMEDIR}/dodo.pids ]; then
-  kill $(cat ${HOMEDIR}/dodo.pids)
+if [ -f ${HOMEDIR}/dodo_nethub.pids ]; then
+  kill $(cat ${HOMEDIR}/dodo_nethub.pids) > /dev/null 2>&1
 fi
 
 mkdir -p ${HOMEDIR}/logs
@@ -27,4 +27,6 @@ java ${DEBUG_DODO} -cp ${HOMEDIR}/build/libs/dodo-1.0.jar \
 
 dodo_pid=$!
 
-echo $nethub_pid $dodo_pid > ${HOMEDIR}/dodo.pids
+echo $nethub_pid $dodo_pid > ${HOMEDIR}/dodo_nethub.pids
+# write the DodoServer pid to its own file so we can send SIGHUP easily
+echo $dodo_pid > ${HOMEDIR}/dodo.pid
