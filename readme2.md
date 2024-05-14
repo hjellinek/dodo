@@ -19,3 +19,12 @@ $ java -jar build/libs/dodo-1.0.jar &
 ````bash
 $ java -cp build/libs/dodo-1.0.jar dev.hawala.xns.DodoServer
 ````
+
+## Alternatively, you can run the `dodoserver-and-nethub.sh` script
+
+This produces the file `dodo.properties` from `dodo.properties.template`, redirects output
+to a set of log files, and records the process IDs for ease of termination later.
+
+````bash
+$ src/main/scripts/dodoserver-and-nethub.sh
+````
