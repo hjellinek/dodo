@@ -653,7 +653,11 @@ public class FilingImpl {
 			fe = vol.openByName(name, parentId, type, version, session.getUsername());
 		} else if (pathname != null) {
 			List<PathElement> path = PathElement.parse(pathname);
-			fe = vol.openByPath(path, parentId, type, version, session.getUsername());
+			PathElement fileElem = path.get(path.size() - 1);
+			Integer fileVersion = (fileElem.getVersion() != PathElement.HIGHEST_VERSION || pathname.endsWith("!+"))
+					? (Integer)fileElem.getVersion() /* the client explicitly specified a version for the file item (last path element), so use that version */
+					: version;                       /* no version specified for the last path element, so use the possibly specified 'version' attribute */
+			fe = vol.openByPath(path, parentId, type, fileVersion, session.getUsername());
 		}
 		
 		// check the outcome

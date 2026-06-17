@@ -764,9 +764,13 @@ still missing, like Mail protocols)
 
 ### Development history
 
+- 2026-06-17    
+-- merged request #25 "These options will never match" by hjellinek    
+-- FS: hopefully fixed bug #26 reported by nbriggs (open() delivers wrong version, Interlisp-specific)
+
 - 2023-09-12    
 -- ECS: added option *startExternalCommunicationService*    
--- ECS: fox for starting the service only if CHS is also started on this instance    
+-- ECS: fix for starting the service only if CHS is also started on this instance    
 -- BS: fixed config parameter *bootService.baseDir* to match documentation
 
 - 2023-04-07    
