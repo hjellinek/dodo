@@ -89,6 +89,7 @@ public class Volume {
 	private static final String DATADIR_PATTERN = "files-%016X";
 	private static final String DATAFILE_PATTERN = "%016X.data";
 	private static final String ROOTFOLDERS_FILE = "root-folder.lst";
+	private static final String ALLOW_NON_UNIQUE_NAMES = ":allowNonUniqueNames:";
 	
 	private static final String METADATA_GEN_DELTA_PATTERN = "%016X.delta-meta";
 	private static final String METADATA_GEN_FULL_PATTERN = "%016X.full-meta";
@@ -275,7 +276,7 @@ public class Volume {
 		}
 		vol.filesInlastDataDir = lastFileCount;
 		
-		// create the current baseline metadata => reduce number of files to read in next time (if volumne is not closed normally)
+		// create the current baseline metadata => reduce number of files to read in next time (if volume is not closed normally)
 		vol.saveMetadataBaseline();
 		
 		// backup the move now obsolete metadata file to a ZIP archive in 'old-metadata'
@@ -396,6 +397,9 @@ public class Volume {
 			
 			// determine the version for the new file
 			int fVersion = (version != null) ? version.intValue() : 1;
+			if (fVersion <= 0 || fVersion >= 0xFFFF) {
+				fVersion = 1;
+			}
 			if (oldChild != null && fVersion <= oldChild.getVersion()) {
 				fVersion = oldChild.getVersion() + 1;
 			}
@@ -1216,12 +1220,19 @@ public class Volume {
 				
 				String folderName = parts[0];
 				String folderOwner = parts[1];
+				boolean allowNonUniqueNames = folderOwner.startsWith(ALLOW_NON_UNIQUE_NAMES);
+				if (allowNonUniqueNames) {
+					folderOwner = folderOwner.substring(ALLOW_NON_UNIQUE_NAMES.length());
+				}
 				if (folderName.isEmpty() || folderOwner.isEmpty()) { continue; }
 				
-				// check if the folder is present
+				// check if the folder is present and possibly upgrade the ChildrenUniquelyNamed attribute to false
 				boolean folderExists = false;
 				for (FileEntry e : this.rootFolders.getChildren()) {
 					if (folderName.equalsIgnoreCase(e.getName())) {
+						if (allowNonUniqueNames && e.isChildrenUniquelyNamed()) {
+							e.setChildrenUniquelyNamed(false);
+						}
 						folderExists = true;
 						break;
 					}
@@ -1231,6 +1242,7 @@ public class Volume {
 				// create missing root folder
 				System.out.printf("checkRootFolders(): creating root folder '%s'\n", folderName);
 				FileEntry fe = new FileEntry(this.nextFileID++, 0, true, folderName, 1, 4098, folderOwner); // "VPDrawer" -> the type listed by VP/GV at fileservice root level
+				fe.setChildrenUniquelyNamed(!allowNonUniqueNames);
 				this.fileEntries.put(fe.getFileID(), fe);
 				this.rootFolders.getChildren().add(fe);
 				List<AccessEntry> accessList = fe.getAccessList();

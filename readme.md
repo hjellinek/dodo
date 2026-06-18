@@ -764,9 +764,11 @@ still missing, like Mail protocols)
 
 ### Development history
 
-- 2026-06-17    
+- 2026-06-17,18    
 -- merged request #25 "These options will never match" by hjellinek    
--- FS: hopefully fixed bug #26 reported by nbriggs (open() delivers wrong version, Interlisp-specific)
+-- FS: fixed bug #26 reported by nbriggs (open() delivers wrong version, Interlisp-specific)    
+-- FS: added possibility for initializing file drawers to allow non unique names
+-- FS: ignore versions specified outside [1..177777B) when creating file objects
 
 - 2023-09-12    
 -- ECS: added option *startExternalCommunicationService*    

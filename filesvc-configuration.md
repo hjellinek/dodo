@@ -120,12 +120,19 @@ the *accesscode* is a single character identifying the permissions for the user
 or `W` for write access. The *3-part-chs-username* can specify a single user or
 a user-group defined in the clearinghouse, or a pattern for an existing domain and organization.
 
+By default file drawers will be created with the _childrenUniquelyNamed_ attribute set to `true`.
+This can be changed by prefixing the _owning user_ field with `:allowNonUniqueNames:`; this
+prefix will be removed from the owner (which must the be a 3-part CHS name) and the file drawers
+_childrenUniquelyNamed_ attribute will be set to `false`, allow for multiple versions of the same file name.    
+(if the drawer already exists, then only setting the attribute to `false` is supported)
+
 Example:    
 the following content for the `root-folders.lst` will initialize the volume
 with 2 file drawers, both owned by user `admin:dev:hawala`, granting write access
-for the second drawer (`test`) to all users in the `:dev:hawala` domain:
+for the second drawer (`test`) to all users in the `:dev:hawala` domain and allowing
+non unique file names on the drawer `hans`:
 
-	hans    admin:dev:hawala
+	hans    :allowNonUniqueNames:admin:dev:hawala
 	test    admin:dev:hawala    w!*:dev:hawala
 
 ### Volume backup and restore
