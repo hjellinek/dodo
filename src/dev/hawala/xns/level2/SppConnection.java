@@ -998,7 +998,7 @@ public class SppConnection {
 		sppPacket
 			.setDstConnectionId(this.othersConnectionId)
 			.setSrcConnectionId(this.myConnectionId)
-			.setAcknowledgeNumber(this.inNextExpectedSeqNo + 1)
+			.setAcknowledgeNumber(this.inNextExpectedSeqNo)
 			.setAllocationNumber(this.inMaxAllowedSeqNo)
 			.setSequenceNumber(Math.max(0, this.myNextSeqNo - 1));
 		sppPacket.idp

@@ -543,7 +543,7 @@ public class FilingImpl {
 		
 		Session session = resolveSession(params.session, false);
 		if (session != null) {
-			session.close();
+			session.close("logoff");
 			dropSession(session);
 		} else {
 			new SessionErrorRecord(SessionProblem.tokenInvalid).raise();

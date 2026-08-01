@@ -76,7 +76,7 @@ public class Service implements Runnable {
 			this.sessionWatcher.interrupt();
 		}
 		for (Session s: this.sessions) {
-			s.close();
+			s.close("service shutdown");
 		}
 		try {
 			this.sessionWatcher.join();
@@ -93,7 +93,7 @@ public class Service implements Runnable {
 				Thread.sleep(500); // 500 ms
 				for (Session s: this.getCurrentSessions()) {
 					if (s.isOverdue()) {
-						s.close();
+						s.close(("overdue"));
 					}
 				}
 			}

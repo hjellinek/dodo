@@ -764,6 +764,10 @@ still missing, like Mail protocols)
 
 ### Development history
 
+- 2026-08-01    
+-- CHS: fixed bug #28 ('members'-property was set on 1st usage, preventing to find chs-entries by property-search)    
+-- SPP: fixed bug #29 (nextExpectedSeqNo +1 regression introduced with GAP implementation)
+
 - 2026-06-17,18    
 -- merged request #25 "These options will never match" by hjellinek    
 -- FS: fixed bug #26 reported by nbriggs (open() delivers wrong version, Interlisp-specific)    

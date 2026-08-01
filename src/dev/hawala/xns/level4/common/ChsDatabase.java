@@ -1123,23 +1123,19 @@ public class ChsDatabase {
 	
 	private class ChsUserGroup extends ChsGroupEntry {
 		
-		private boolean initializeGroupProperties = true;
-		
 		public ChsUserGroup(File cfgFile) {
 			super(CHEntries0.userGroup, cfgFile);
+			
+			// create the grop-property 'members' from the user-group members
+			List<ThreePartName> memberNames = new ArrayList<>();
+			for (String fqn : this.getMemberFqns()) {
+				memberNames.add(Name.make().from(fqn));
+			}
+			this.putGroupProperty(CHEntries0.members, memberNames);
 		}
 		
 		@Override
 		public List<ThreePartName> getGroupProperty(int property) {
-			if (this.initializeGroupProperties) {
-				List<ThreePartName> memberNames = new ArrayList<>();
-				for (String fqn : this.getMemberFqns()) {
-					memberNames.add(Name.make().from(fqn));
-				}
-				this.putGroupProperty(CHEntries0.members, memberNames);
-				this.initializeGroupProperties = false;
-			}
-			
 			return super.getGroupProperty(property);
 		}
 		

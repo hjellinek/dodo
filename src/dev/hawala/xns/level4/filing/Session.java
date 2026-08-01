@@ -35,7 +35,7 @@ import dev.hawala.xns.level4.common.AuthChsCommon.ThreePartName;
  */
 public class Session {
 	
-	public static final int CONTINUANCE_DURANCE_DEFAULT = 60_000; // 1 minute in ms
+	public static final int CONTINUANCE_DURANCE_DEFAULT = 120_000; // 2 minutes in ms
 	public static final int CONTINUANCE_DURANCE_FILING4 = 3600_000; // 1 hour in ms
 	
 	private static int lastSessionId = (int)(System.currentTimeMillis() & 0xFFFF_FFFF);
@@ -76,7 +76,7 @@ public class Session {
 	}
 	
 	private void logStatus(String msg) {
-		// System.out.printf("+++++++++++++++++++++++++++++++++++++++++++++++++ Session 0x%08X :: %s\n", this.sessionId, msg);
+		// System.out.printf("%09d ++++++++++++++++++++++ Filing-Session 0x%08X :: %s\n", System.currentTimeMillis(), this.sessionId, msg);
 	}
 	
 	public Service getService() {
@@ -114,8 +114,8 @@ public class Session {
 		return this.nextContinuanceDueMillisecs < System.currentTimeMillis();
 	}
 	
-	public synchronized void close() {
-		this.logStatus("closed");
+	public synchronized void close(String reason) {
+		this.logStatus("closed (" + reason + ")");
 		if (this.disableClosing) {
 			return;
 		}
