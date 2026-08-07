@@ -72,8 +72,8 @@ public class DirectoryChildren {
 	}
 	
 	public void add(FileEntry newChild) {
-		// TODO: extend for positioning the new child at the parents ordering position
 		this.children.add(newChild);
+		this.reorder();
 	}
 	
 	public void reorder() {
@@ -94,6 +94,30 @@ public class DirectoryChildren {
 		for (FileEntry f : this.children) {
 			f.setPosition(position++);
 		}
+	}
+	
+	public boolean isLowestVersionOfName(FileEntry fe) {
+		List<FileEntry> feVersions = this.findVersionsOf(fe);
+		return (feVersions.size() == 1) || (fe == feVersions.get(0));
+	}
+	
+	public boolean isHighestVersionOfName(FileEntry fe) {
+		List<FileEntry> feVersions = this.findVersionsOf(fe);
+		return (feVersions.size() == 1) || (fe == feVersions.get(feVersions.size() - 1));
+	}
+	
+	public List<FileEntry> findVersionsOf(FileEntry fe) {
+		List<FileEntry> entries = new ArrayList<>();
+		String lcName = fe.getLcName();
+		for (FileEntry e : this.children) {
+			if (lcName.equals(e.getLcName())) {
+				entries.add(e);
+			}
+		}
+		if (entries.size() > 1) {
+			entries.sort( (l,r) -> Integer.compare(l.getVersion(), r.getVersion()) );
+		}
+		return entries; // this should contain at least 'fe'! 
 	}
 
 }

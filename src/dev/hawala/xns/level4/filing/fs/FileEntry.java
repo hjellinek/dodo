@@ -359,9 +359,21 @@ public class FileEntry {
 	 * internal methods
 	 */
 	
+	private String pathEscapedName() {
+		return this.name.replaceAll("'", "''").replaceAll("/", "'/").replaceAll("!", "'!");
+	}
+	
 	private String computePathname() {
 		String parentPath = (this.parent != null) ? this.parent.computePathname() + "/" : "";
-		return parentPath + this.name + "!" + this.version;
+		return parentPath + this.pathEscapedName() + "!" + this.version;
+	}
+	
+	private void innercomputePath(ArrayList<PathElement> path, boolean lowerCased) {
+		if (this.fileID == FsConstants.rootFileID || this.parentID == 0) {
+			return;
+		}
+		this.parent.innercomputePath(path, lowerCased);
+		path.add(new PathElement(lowerCased ? this.getLcName() : this.name, this.version));
 	}
 	
 	/*
@@ -370,6 +382,12 @@ public class FileEntry {
 	
 	public String getPathname() {
 		return this.computePathname();
+	}
+	
+	public ArrayList<PathElement> getPath(boolean lowerCased) {
+		ArrayList<PathElement> path = new ArrayList<>();
+		this.innercomputePath(path, lowerCased);
+		return path;
 	}
 
 	public long getSubtreeSize() {
@@ -624,7 +642,18 @@ public class FileEntry {
 		}
 		return null;
 	}
-
+	
+	/*
+	 * service methods
+	 */
+	
+	public boolean isLowestVersion() {
+		return (this.fileID ==  0 || this.fileID == FsConstants.rootFileID) || this.getParent() == null || this.getParent().getChildren().isLowestVersionOfName(this);
+	}
+	
+	public boolean isHighestVersion() {
+		return (this.fileID ==  0 || this.fileID == FsConstants.rootFileID) || this.getParent() == null || this.getParent().getChildren().isHighestVersionOfName(this);
+	}
 	
 	/*
 	 * misc methods

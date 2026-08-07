@@ -49,6 +49,7 @@ import dev.hawala.xns.level4.filing.FilingCommon.UndefinedErrorRecord;
 import dev.hawala.xns.level4.filing.fs.AccessEntry;
 import dev.hawala.xns.level4.filing.fs.FileEntry;
 import dev.hawala.xns.level4.filing.fs.FsConstants;
+import dev.hawala.xns.level4.filing.fs.PathElement;
 import dev.hawala.xns.level4.filing.fs.UninterpretedAttribute;
 import dev.hawala.xns.level4.filing.fs.iValueFilter;
 import dev.hawala.xns.level4.filing.fs.iValueGetter;
@@ -428,7 +429,7 @@ public class AttributeUtils {
 				
 				);
 
-		// derive the file=>courier attribute mapping array for filing version 4 by copy the version5/6 list and replacing version specifing mappings
+		// derive the file=>courier attribute mapping array for filing version 4 by copying the version5/6 list and replacing version specific mappings
 		file2courier_interpreted4 = new ArrayList<>(file2courier_interpreted5or6);
 		// access-lists: access value has a different representation in Filing4 (bitmap in a word instead of enum-sequence)
 		file2courier_interpreted4.set(19, (s,fe) -> file2courier_accessList(s, FilingCommon.atAccessList, fe.isAccessListDefaulted(), fe.getAccessList(), true));
@@ -438,7 +439,7 @@ public class AttributeUtils {
 		file2courier_interpreted4.set(27, (s,fe) -> s.value.add().setAsLongCardinal(FilingCommon.atSubtreeSize, (fe.getSubtreeSize() + 511) / 512) );
 	}
 	
-	public static iValueFilter buildPredicate(CHOICE<FilterType> filter) {
+	public static iValueFilter buildPredicate(CHOICE<FilterType> filter, FileEntry baseDir) {
 		// handle structural filter types first
 		switch(filter.getChoice()) {
 		case all:
@@ -447,7 +448,7 @@ public class AttributeUtils {
 				return fe -> false;
 		case not: {
 				FilterRecord tmpFilter = (FilterRecord)filter.getContent();
-				iValueFilter tmpPredicate = buildPredicate(tmpFilter.value);
+				iValueFilter tmpPredicate = buildPredicate(tmpFilter.value, baseDir);
 				return fe -> !tmpPredicate.isElligible(fe);
 			}
 		case or:
@@ -458,7 +459,7 @@ public class AttributeUtils {
 				}
 				iValueFilter[] tmpPredicates = new iValueFilter[tmpFilters.seq.size()];
 				for (int i = 0; i < tmpPredicates.length; i++) {
-					tmpPredicates[i] = buildPredicate(tmpFilters.seq.get(i));
+					tmpPredicates[i] = buildPredicate(tmpFilters.seq.get(i), baseDir);
 				}
 				if (filter.getChoice() == FilterType.or) {
 					return fe -> {
@@ -483,14 +484,35 @@ public class AttributeUtils {
 		if (filter.getChoice() == FilterType.matches) {
 			Attribute attr = (Attribute)filter.getContent();
 			if (attr.type.get() == FilingCommon.atName) {
-				String pattern = convertPattern(attr.getAsString());
+				String pattern = convertPattern(attr.getAsString(), PathElement.ANY_VERSION).pattern;
 				return fe -> fe.getLcName().matches(pattern);
-			} else if (attr.type.get() == FilingCommon.atPathname) {
-				// TODO: build special pathname pattern matcher
-
-				// temp: use a simple (non-path-capable) matcher...
-				String pattern = convertPattern(attr.getAsString());
-				return fe -> fe.getPathname().toLowerCase().matches(pattern);
+			} else if (attr.type.get() == FilingCommon.atPathname) { // build a special pathname pattern matcher				
+				// get the pathName segments
+				String pathPattern = attr.getAsString();
+				
+				System.out.printf("+++ buildPredicate for 'matches' type 'atPathname' :: »%s«\n", pathPattern);
+				List<PathElement> pathElements = PathElement.parse(pathPattern, true);
+				if (pathElements.isEmpty()) {
+					new ScopeTypeErrorRecord(ArgumentProblem.unreasonable, ScopeType.filter).raise();
+				}
+				
+				// get the patterns to match each segment, ordered from the end (the file to find) towards the base-directory of the search 
+				List<PatternDef> patternsLeafToBaseDir = new ArrayList<>();
+				for (int idx = pathElements.size() - 1; idx >= 0; idx--) {
+					PathElement elem = pathElements.get(idx);
+					patternsLeafToBaseDir.add(convertPattern(elem.getName(), elem.getVersion()));
+				}
+				
+				System.out.printf("+++\n");
+				System.out.printf("+++ search base-dir: »%s«\n", (baseDir == null) ? "(volume-root)" : baseDir.getName());
+				System.out.printf("+++ path-segment matcher:\n");
+				for (PatternDef pat : patternsLeafToBaseDir) {
+					System.out.printf("+++   %s\n", pat.toString());
+				}
+				System.out.printf("+++\n");
+				
+				// produce the more complex matcher over path elements
+				return new PathnameMatcher(patternsLeafToBaseDir, baseDir);
 			} else {
 				new ScopeTypeErrorRecord(ArgumentProblem.unreasonable, ScopeType.filter).raise();
 			}
@@ -589,15 +611,14 @@ public class AttributeUtils {
 			}
 		case FilingCommon.atVersion: {
 			int val = attr.getAsCardinal();
-			// begin temp:
-			// if the required version is 0 (lowest) or 0xFFFF (highest), the
-			// version and name attributes must be checked together; but this
-			// currently not supported (maybe later), so these required values
-			// will temporarily match any version
-			if (val == 0 || val == 0xFFFF) {
-				return fe -> true;
-			}
-			// end temp
+
+			// check if the file is the first available version for the name?
+			if (val == 0) { return fe -> fe.isLowestVersion(); }
+
+			// check if the file is the last available version for the name?
+			if (val == 0xFFFF) { return fe -> fe.isHighestVersion(); }
+			
+			// anything else: check the file for the specified version
 			return fe -> compare(val, fe.getVersion(), evaluator);
 			}
 		case FilingCommon.atPathname: {
@@ -630,10 +651,133 @@ public class AttributeUtils {
 		return evaluator.test(value.compareTo(constant));
 	}
 	
-	private static String convertPattern(String xnsPattern) {
+	/**
+	 * pathName search pattern filter
+	 * 
+	 * the search strategy is to match the requested path patterns from the leaf (candidate file)
+	 * to the base directory of the search, so the singular patterns derived from the 'atPathname'-filter
+	 * are expected in reversed order ("from right to left") when constructing the 'PathnameMatcher' and
+	 * they will be applied in this order, matching the patterns from the candidate file up the path until
+	 * the search base directory is reached;
+	 * this strategy of going backwards in the 'atPathname'-pattern allows to apply the '**'-wildcard
+	 * in a path-element ("match multiple components", meaning that this path-segment-pattern can match in
+	 * this directory or its sub-directories) in the 'iValueFilter'-context, where we do not actively
+	 * search for items matching the pattern, but have to verify if a candidate satisfies the pattern,
+	 * where the presence the 0..n intermediate directories for a given path-pattern can also be checked
+	 * when testing the parent(s) for the parent-path-pattern.   
+	 * 
+	 */
+	private static class PathnameMatcher implements iValueFilter {
+		
+		private final List<PatternDef> patternsLeafToBaseDir;
+		private final FileEntry baseDir;
+		
+		private PathnameMatcher(List<PatternDef> patternsLeafToBaseDir, FileEntry baseDir) {
+			this.patternsLeafToBaseDir = patternsLeafToBaseDir;
+			this.baseDir = baseDir;
+		}
+		
+		private boolean matches(FileEntry currFe, PatternDef patternDef) {
+			if (currFe == null || !currFe.getLcName().matches(patternDef.pattern)) {
+				return false;
+			}
+			if (patternDef.version == PathElement.LOWEST_VERSION) {
+				return currFe.isLowestVersion();
+			} else if (patternDef.version == PathElement.HIGHEST_VERSION) {
+				return currFe.isHighestVersion();
+			} else if (patternDef.version != PathElement.ANY_VERSION) {
+				return (currFe.getVersion() == patternDef.version);
+			}
+			return true;
+		}
+
+		@Override
+		public boolean isElligible(FileEntry fe) {
+			// start at the end of both the candidate file and the path-patterns
+			FileEntry currFe = fe;
+			PatternDef currPattern = this.patternsLeafToBaseDir.get(0);
+			
+			// check the candidate file itself (this is the path leaf and *must* match the first pattern)
+			boolean currFeMatches = this.matches(currFe, currPattern);
+			if (!currFeMatches) { return false; }
+			
+			// check the up-tree of the candidate file
+			boolean allowIntermediates = currPattern.matchMultipleLevels;
+			currFe = currFe.getParent();
+			for (int idx = 1; idx < this.patternsLeafToBaseDir.size(); idx++) {
+				// the new (next up-level) search path pattern
+				currPattern = this.patternsLeafToBaseDir.get(idx);
+				
+				// check if the file matches the current pattern
+				// or
+				// if (and only if) the previous pattern allowed to find it down-tree
+				// then iterate upwards until an ancestor matches
+				currFeMatches = this.matches(currFe, currPattern);
+				while (allowIntermediates && currFe != this.baseDir && !currFeMatches) {
+					currFe = currFe.getParent();
+					currFeMatches = this.matches(currFe, currPattern);
+				}
+				if (currFe == this.baseDir) {
+					// we arrived at the start directory for the search,
+					// but this path-pattern it to be applied to the descendants
+					// of the start directory, so...
+					return false;
+				}
+				if (!currFeMatches) {
+					return false;
+				}
+				
+				// prepare for next search path pattern/element
+				currFe = currFe.getParent();
+				allowIntermediates = currPattern.matchMultipleLevels; // check *next* pattern on ancestors if *this* pattern had "match multiple components"
+			}
+			
+			// if we are here, all search pattern elements were satisfied by the up-tree path of 'fe', 
+			// so finally check if we are "close enough" to the 'baseDir'
+			return allowIntermediates        // if "match multiple components": 'baseDir' is always an ancestor of 'currFe'
+				|| (currFe == this.baseDir); // no "match multiple components": 'baseDir' must be the direct parent of the last match
+		}
+		
+	}
+	
+	/*
+	 * search patterns (Filing-wildcards => Java-Regex)
+	 */
+	
+	private static class PatternDef {
+		private final String pattern;
+		private final int version;
+		private final boolean matchMultipleLevels;
+		
+		private PatternDef(String pattern, int version, boolean matchMultipleLevels) {
+			this.pattern = pattern;
+			this.version = version;
+			this.matchMultipleLevels = matchMultipleLevels;
+		}
+
+		@Override
+		public String toString() {
+			return String.format("PatternDef [segment-regex = »%s« , version = %s , multi-level-match = %s",
+					this.pattern,
+					(this.version == PathElement.LOWEST_VERSION)
+					? "lowest"
+					: (this.version == PathElement.HIGHEST_VERSION)
+					? "highest"
+					: (this.version == PathElement.ANY_VERSION)
+					? "any"
+					: Integer.toString(this.version),
+					this.matchMultipleLevels);
+		}
+		
+	}
+	
+	private static PatternDef convertPattern(String xnsPattern, int version) {
 		StringBuilder sb = new StringBuilder();
+		boolean matchMultipleLevels = false;
+		
 		char[] patternChars = xnsPattern.toCharArray();
 		boolean lastWasEscape = false;
+		boolean lastWasStar = false;
 		
 		for (char c : patternChars) {
 			if (lastWasEscape) {
@@ -641,23 +785,32 @@ public class AttributeUtils {
 				lastWasEscape = false;
 			} else if (c == '\'') {
 				lastWasEscape = true;
+				lastWasStar = false;
 			} else if (c == '#') {
 				sb.append(".{1}");
+				lastWasStar = false;
 			} else if (c == '*') {
-				sb.append(".*");
+				if (lastWasStar) {
+					matchMultipleLevels = true;
+					// lastWasStar = false; -- don't reset in case of more than 2 stars => collapse them to a single ".*"
+				} else {
+					sb.append(".*");
+					lastWasStar = true;
+				}
 			} else {
 				appendPlainChar(sb, c);
+				lastWasStar = false;
 			}
 		}
 		
-		return sb.toString().toLowerCase();
+		return new PatternDef(sb.toString().toLowerCase(), version, matchMultipleLevels);
 	}
 	
 	private static void appendPlainChar(StringBuilder sb, char c) {
-		if (c == '*' || c == '(' || c == '[' || c == '{' || c == '?' || c == '\\') {
+		if (c == '.' || c == '+' || c == '*' || c == '?' || c == '(' || c == '[' || c == '{' || c == '|' || c == '^' || c == '\\') {
 			sb.append('\\').append(c);
 		} else {
-			sb.append(c);
+			sb.append(Character.toLowerCase(c));
 		}
 	}
 	

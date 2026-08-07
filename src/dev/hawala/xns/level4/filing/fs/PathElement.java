@@ -38,9 +38,10 @@ import java.util.List;
  */
 public class PathElement {
 	
-	// public static final int ANY_VERSION = -2;
-	public static final int LOWEST_VERSION = -1;
+	// our special version markers
+	public static final int LOWEST_VERSION = -1;     // 0x0000 - 1
 	public static final int HIGHEST_VERSION = 65536; // 0xFFFF + 1
+	public static final int ANY_VERSION = 65537;     // 0xFFFF + 2
 	
 	private final String name;
 	private final int version;
@@ -59,7 +60,14 @@ public class PathElement {
 	}
 	
 	public static List<PathElement> parse(String pathString) {
+		return parse(pathString, false);
+	}
+	
+	public static List<PathElement> parse(String pathString, boolean noVersionIsAnyVersion) {
 		if (pathString == null || pathString.isEmpty()) { return null; }
+		while (pathString.startsWith("/")) {
+			pathString = pathString.substring(1);
+		}
 		
 		// add special path-string-end marker char
 		String ps = pathString + "µ"; // µ is non-ascii and and an xstring-µ should have been recoded away by Dodo's STRING deserializer
@@ -69,7 +77,8 @@ public class PathElement {
 		int len = ps.length();
 		
 		String elemName = null;
-		int elemVersion = HIGHEST_VERSION;
+		int defaultVersion = noVersionIsAnyVersion ? ANY_VERSION : HIGHEST_VERSION;
+		int elemVersion = defaultVersion;
 		
 		List<PathElement> path = new ArrayList<PathElement>();
 		int i = 0;
@@ -91,16 +100,25 @@ public class PathElement {
 				} else {
 					String vs = sb.toString();
 					if (!vs.isEmpty()) { // ignore empty version specs (not filing protocol conformant, but...
-						if ("-".equals(vs)) {
+						// ... we should be more permissive)
+						if (/*"-".equals(vs)*/ vs.startsWith("-")) {
 							elemVersion = LOWEST_VERSION;
-						} else if ("+".equals(vs)) {
+						} else if (/*"+".equals(vs)*/ vs.startsWith("+")) {
 							elemVersion = HIGHEST_VERSION;
 						} else {
-							try {
-								elemVersion = Integer.parseInt(vs) & 0xFFFF;
-							} catch (NumberFormatException nfe) {
-								throw new IllegalArgumentException("Invalid path element version");
+							int intLen = 0;
+							for (int intIdx = 0; intIdx < vs.length(); intIdx++) {
+								if (Character.isDigit(vs.charAt(intIdx))) {
+									intLen++;
+								} else {
+									break;
+								}
 							}
+							if (intLen > 0) {
+								try {
+									elemVersion = Integer.parseInt(vs.substring(0,intLen)) & 0xFFFF;
+								} catch (NumberFormatException nfe) { }
+							} // else use the default if the version is not numeric at all...
 						}
 					}
 				}
@@ -111,7 +129,7 @@ public class PathElement {
 				sb.setLength(0);
 				inName = true;
 				elemName = null;
-				elemVersion = HIGHEST_VERSION;
+				elemVersion = defaultVersion;
 			} else if (c == '!') {
 				elemName = sb.toString();
 				if (elemName.isEmpty()) {

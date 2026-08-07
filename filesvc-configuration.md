@@ -186,22 +186,27 @@ they are currently not interpreted and checked against the session's user identi
     - procedure 7 : ChangeControls()
     - procedure 14: Replace()
     - procedure 20: UnifyAccessLists()
-    - procedure 23: ReplaceBytes()
-    - procedure 22: RetrieveBytes()
 
 #### Incomplete implementation
 
 - procedure 17 Find():    
--- matching for the name attribute will probably find the wrong file
-if the pattern or the file name contain non-ascii characters    
--- matching for the pathname attribute is unimplemented and will not find the file
+matching for the name attribute will probably find the wrong file
+if the pattern or the file name contain non-ascii characters
 
 - procedure 18 List():    
--- matching for the name attribute will probably produce mismatches (false or missing hits)
-if the pattern or the file name contain non-ascii characters    
--- matching for the pathname attribute is unimplemented and will never match    
--- enumeration in backward direction is unsupported and rejected with an error
+matching for the name attribute will probably produce mismatches (false or missing hits)
+if the pattern or the file name contain non-ascii characters
 
 #### Known problems
 
 (currently none so far)
+
+#### Hints
+
+When specifying a `matches`>>`pathname` scope-filter in Courier procs find()/list(),
+the `maxDepth` scope-parameter must be at least the number of directory-segments in
+the given *pathname* and possibly larger if a wildcarded pathname-segment specifies to match
+multiple components with 2 consecutive asterisk characters.    
+For example a *pathname* `*loss*/**f*!-` requires at least a *maxDepth* = 2 for finding
+any matching files and larger than 2 for finding files matching `*f*` in subdirectories
+of directories matching `*loss*` in the base search directory.

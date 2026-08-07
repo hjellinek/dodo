@@ -1695,10 +1695,15 @@ public class FilingImpl {
 		
 		// check specified file handle
 		Handle dirHandle = Handle.get(params.directory);
-		long dirFileID = (dirHandle == null || dirHandle.isNullHandle() || dirHandle.isVolumeRoot()) ? 0 : dirHandle.getFe().getFileID();
+		FileEntry dirFile = (dirHandle == null || dirHandle.isNullHandle() || dirHandle.isVolumeRoot())
+				? null
+				: dirHandle.getFe();
+		long dirFileID = (dirFile == null)
+				? 0                    // use the root folders of the volume
+				: dirFile.getFileID(); // use file specified directory
 		
 		// do the enumeration
-		final List<FileEntry> hits = getFileHits(session, dirFileID, new ScopeData(params.scope));
+		final List<FileEntry> hits = getFileHits(session, dirFileID, new ScopeData(params.scope, dirFile));
 		
 		// get the first hit or raise error if no matching file found
 		if (hits.isEmpty()) {
@@ -1718,10 +1723,15 @@ public class FilingImpl {
 		
 		// check specified file handle
 		Handle dirHandle = Handle.get(params.directory);
-		long dirFileID = (dirHandle == null || dirHandle.isNullHandle() || dirHandle.isVolumeRoot()) ? 0 : dirHandle.getFe().getFileID();
+		FileEntry dirFile = (dirHandle == null || dirHandle.isNullHandle() || dirHandle.isVolumeRoot())
+				? null
+				: dirHandle.getFe();
+		long dirFileID = (dirFile == null)
+				? 0                    // use the root folders of the volume
+				: dirFile.getFileID(); // use file specified directory
 		
 		// do the enumeration
-		final List<FileEntry> hits = getFileHits(session, dirFileID, new ScopeData(params.scope));
+		final List<FileEntry> hits = getFileHits(session, dirFileID, new ScopeData(params.scope, dirFile));
 		
 		// get the first hit or raise error if no matching file found
 		if (hits.isEmpty()) {
@@ -1753,22 +1763,30 @@ public class FilingImpl {
 		
 		// check specified file handle
 		Handle dirHandle = Handle.get(params.directory);
-		long dirFileID = (dirHandle == null || dirHandle.isNullHandle() || dirHandle.isVolumeRoot()) ? 0 : dirHandle.getFe().getFileID();
+		FileEntry dirFile = (dirHandle == null || dirHandle.isNullHandle() || dirHandle.isVolumeRoot())
+				? null
+				: dirHandle.getFe();
+		long dirFileID = (dirFile == null)
+				? 0                    // use the root folders of the volume
+				: dirFile.getFileID(); // use file specified directory
 		
 		// do the enumeration
-		final List<FileEntry> hits = getFileHits(session, dirFileID, new ScopeData(params.scope));
+		final List<FileEntry> hits = getFileHits(session, dirFileID, new ScopeData(params.scope, dirFile));
 		
 		// prepare the attribute getters
 		List<iValueGetter<FilingCommon.AttributeSequence>> getters = getFile2CourierAttributeGetters(params.types, session.getFilingVersion());
 		
 		// build the result stream and send it
 		StreamOf<AttributeSequence> stream = new StreamOf<>(0, 1, 16, AttributeSequence::make);
+		System.out.printf("+++\n+++ %d files matched:\n", hits.size());
 		for (FileEntry fe : hits) {
+			System.out.printf("++ -> %s\n", fe.getPathname());
 			AttributeSequence as = stream.add();
 			for (iValueGetter<FilingCommon.AttributeSequence> getter : getters) {
 				getter.access(as, fe);
 			}
 		}
+		System.out.printf("+++++++++\n");
 		sendBulkData("list", params.listing, stream);
 	}
 	private static void list4(ListParams4 params, RECORD results) {
@@ -1779,10 +1797,15 @@ public class FilingImpl {
 		
 		// check specified file handle
 		Handle dirHandle = Handle.get(params.directory);
-		long dirFileID = (dirHandle == null || dirHandle.isNullHandle() || dirHandle.isVolumeRoot()) ? 0 : dirHandle.getFe().getFileID();
+		FileEntry dirFile = (dirHandle == null || dirHandle.isNullHandle() || dirHandle.isVolumeRoot())
+				? null
+				: dirHandle.getFe();
+		long dirFileID = (dirFile == null)
+				? 0                    // use the root folders of the volume
+				: dirFile.getFileID(); // use file specified directory
 		
 		// do the enumeration
-		final List<FileEntry> hits = getFileHits(session, dirFileID, new ScopeData(params.scope));
+		final List<FileEntry> hits = getFileHits(session, dirFileID, new ScopeData(params.scope, dirFile));
 		
 		// prepare the attribute getters
 		List<iValueGetter<FilingCommon.AttributeSequence>> getters = getFile2CourierAttributeGetters(params.types, session.getFilingVersion());
@@ -1893,6 +1916,9 @@ public class FilingImpl {
 	
 	private static List<FileEntry> getFileHits(Session session, long dirFileID, ScopeData scopeData) {
 		
+		System.out.printf("+++ scope: maxCount = %d , maxDepth = %d , backward = %s\n",
+				scopeData.maxCount, scopeData.maxDepth, scopeData.backward);
+		
 		// do the enumeration
 		final List<FileEntry> hits;
 		if (scopeData.maxDepth < 2) {
@@ -1932,7 +1958,7 @@ public class FilingImpl {
 		private final boolean backward;
 		private final iValueFilter valueFilter;
 		
-		private ScopeData(ScopeSequence scope) {
+		private ScopeData(ScopeSequence scope, FileEntry baseDir) {
 			int maxCount = FilingCommon.unlimitedCount;
 			int maxDepth = 1;
 			boolean backward = false;
@@ -1954,7 +1980,7 @@ public class FilingImpl {
 					break; }
 				case filter: {
 					FilterRecord ft = (FilterRecord)singleScope.getContent();
-					valueFilter = AttributeUtils.buildPredicate(ft.value);
+					valueFilter = AttributeUtils.buildPredicate(ft.value, baseDir);
 					break; }
 				}
 			}
@@ -1965,7 +1991,7 @@ public class FilingImpl {
 			this.valueFilter = valueFilter;
 		}
 		
-		private ScopeData(ScopeSequence4 scope) {
+		private ScopeData(ScopeSequence4 scope, FileEntry baseDir) {
 			int maxCount = FilingCommon.unlimitedCount;
 			int maxDepth = 1;
 			boolean backward = false;
@@ -1987,7 +2013,7 @@ public class FilingImpl {
 					break; }
 				case filter: {
 					FilterRecord ft = (FilterRecord)singleScope.getContent();
-					valueFilter = AttributeUtils.buildPredicate(ft.value);
+					valueFilter = AttributeUtils.buildPredicate(ft.value, baseDir);
 					break; }
 				case ordering:
 					// Filing4 'ordering'-scope is ignored ! 
